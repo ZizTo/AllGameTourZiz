@@ -2,6 +2,8 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.contrib.auth import authenticate, login, logout
 from .forms import LoginForm
+from .models import User, GameStats
+
 
 def loginView(request):
     if request.method == 'POST':
@@ -26,8 +28,27 @@ def loginView(request):
     else:
         return HttpResponse("<h1>No method found</h1>")
 
+
 def logoutView(request):
     logout(request)
     return HttpResponseRedirect("/users/login/")
 
+
+def profile_view(request, usname):
+    users = User.objects.filter(username=usname)
+    if not users.exists():
+        return render(request, "errors/user_not_found.html", {"user": request.user})
+
+    user = users.first()
+    context = {"user": request.user}
+
+    context['viewuser'] = user
+    context['stats'] = user.gamestats_set.all()
+
+    return render(request, "profile.html", context)
+
+
+
+def all_profiles_view(request):
+    return HttpResponseRedirect("/users/login/")
 # Create your views here.

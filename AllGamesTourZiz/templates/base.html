@@ -5,12 +5,12 @@
     <title>{% block title %}Default title{% endblock title %}</title>
 </head>
 <body>
-    <div>
+    <header>
         <a href="/">Главная</a> | <a href="/contacts">Контакты</a> |
         {% if user.is_authenticated %} {{ user.username }}
         {% else %} <a href="/users/login/">Войти</a>
         {% endif %}
-    </div>
+    </header>
 
     <div>{% block content%}Тут что-то будет{% endblock content %}</div>
 

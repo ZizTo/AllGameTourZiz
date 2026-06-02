@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}{{ viewuser.username }} профиль{% endblock %}
+
+{% block content %}
+    {% include "avatar.html" with avatar=viewuser.avatar only%}
+    <p>{{ viewuser.username }}</p>
+    <p>{{ viewuser.MMR }} MMR</p>
+    <table>
+    {% for stat in stats %}
+        <tr>
+            <td>{% include "avatar.html" with avatar=stat.game.image only%}</td>
+            <td>{{ stat.game.name }}</td>
+            <td>{{ stat.MMR }} MMR</td>
+        </tr>
+    {% empty %}
+        <tr><td>Не игрун этот игрок</td></tr>
+    {% endfor %}
+    </table>
+{% endblock %}
