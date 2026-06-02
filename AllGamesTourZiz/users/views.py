@@ -1,8 +1,10 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.contrib.auth import authenticate, login, logout
-from .forms import LoginForm
+from .forms import LoginForm, SearchForm
 from .models import User, GameStats
+import math
+import re
 
 
 def loginView(request):
@@ -16,7 +18,7 @@ def loginView(request):
 
             if user is not None:
                 login(request, user)
-                return HttpResponseRedirect("/users/login/")
+                return HttpResponseRedirect(f"/users/{username}")
             else:
                 return render(request, "loginpage.html",
                               {"user": request.user, "loginForm": loginForm, "error": "bad login or password, bro"})
@@ -48,7 +50,31 @@ def profile_view(request, usname):
     return render(request, "profile.html", context)
 
 
+MAX_ON_PAGE = 3
 
 def all_profiles_view(request):
-    return HttpResponseRedirect("/users/login/")
-# Create your views here.
+    search = request.GET.get('search', '')
+    if not bool(re.match(r"^[a-zA-Z0-9 ]+$", search)) or len(search) > 20:
+        search = ''
+
+    searchparam = f"/users/?search={search}" if search else "/users/"
+    try:
+        page = int(request.GET.get("page", 1))
+        lastpage = math.floor(((User.objects.filter(username__icontains=search).count() - 1) / MAX_ON_PAGE) + 1)
+        if page < 1 or page > lastpage:
+            return HttpResponseRedirect(searchparam)
+    except:
+        return HttpResponseRedirect(searchparam)
+
+    context = {"user": request.user, 'page': page}
+    if page > 1:
+        context['prevpage'] = searchparam + (f'&page={page-1}' if search else f"?page={page-1}")
+    if page < lastpage:
+        context['nextpage'] = searchparam + (f'&page={page+1}' if search else f"?page={page+1}")
+    if search != '':
+        context['search'] = search
+    filtredusers = User.objects.filter(username__icontains=search)
+    usersonpage = filtredusers.order_by("-MMR", "username")[(page-1)*MAX_ON_PAGE:page*MAX_ON_PAGE]
+    context['allusers'] = usersonpage.values("username", "avatar", "MMR")
+
+    return render(request, "allprofiles.html", context)

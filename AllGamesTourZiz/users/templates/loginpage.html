@@ -4,7 +4,7 @@
 
 {% block content %}
     {% if user.is_authenticated %}
-        <a href="/users/logout">Ливаем</a> с акка {{ user.username }}?
+        <a href="/users/logout/">Ливаем</a> с акка {{ user.username }}?
     {% else %}
         <p>Входим, господа</p>
         <form method="POST">

@@ -8,11 +8,13 @@
     <p>{{ viewuser.MMR }} MMR</p>
     <table>
     {% for stat in stats %}
+        {% if not stat.game.relateOnId %}
         <tr>
             <td>{% include "avatar.html" with avatar=stat.game.image only%}</td>
             <td>{{ stat.game.name }}</td>
             <td>{{ stat.MMR }} MMR</td>
         </tr>
+        {% endif %}
     {% empty %}
         <tr><td>Не игрун этот игрок</td></tr>
     {% endfor %}

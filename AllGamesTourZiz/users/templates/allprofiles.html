@@ -3,18 +3,45 @@
 {% block title %}Крутые челики{% endblock %}
 
 {% block content %}
-    {% include "avatar.html" with avatar=viewuser.avatar only%}
-    <p>{{ viewuser.username }}</p>
-    <p>{{ viewuser.MMR }} MMR</p>
+    <form method="GET">
+        <input type="text" name="search" value="{{search}}">
+        <input type="submit" value="Send">
+    </form>
+    <p>Крутые челики</p>
     <table>
-    {% for stat in stats %}
-        <tr>
-            <td>{% include "avatar.html" with avatar=stat.game.image only%}</td>
-            <td>{{ stat.game.name }}</td>
-            <td>{{ stat.MMR }} MMR</td>
+    {% for oneuser in allusers %}
+        <tr class="clickable-row" data-href="/users/{{oneuser.username}}">
+            <td>{% include "avatar.html" with avatar=oneuser.avatar only%}</td>
+            <td>{{ oneuser.username }}</td>
+            <td>{{ oneuser.MMR }} MMR</td>
         </tr>
     {% empty %}
-        <tr><td>Не игрун этот игрок</td></tr>
+        <tr><td>Нет типов(((</td></tr>
     {% endfor %}
     </table>
+    {% if prevpage %}<a href="{{ prevpage }}">Назад</a> {% endif %}
+    Страница {{page}}
+    {% if nextpage %}<a href="{{ nextpage }}">Вперёд</a> {% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const rows = document.querySelectorAll(".clickable-row");
+
+  rows.forEach(row => {
+    row.addEventListener("click", () => {
+      window.location.href = row.dataset.href;
+    });
+  });
+});
+</script>
+
+<style>
+.clickable-row {
+  cursor: pointer;
+}
+.clickable-row:hover {
+  background-color: #f5f5f5;
+}
+</style>
+
 {% endblock %}
