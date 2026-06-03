@@ -6,7 +6,7 @@
 </head>
 <body>
     <header>
-        <a href="/users/">Игроки</a> |
+        <a href="/users/">Игроки</a> | <a href="/games/">Игры</a> |
         {% if user.is_authenticated %} <a href="/users/{{ user.username }}">{{ user.username }}</a>
         | <a href="/users/login">Выйти с акка</a>
         {% else %} <a href="/users/login/">Войти</a>
@@ -17,4 +17,25 @@
 
     <footer>Привет от зизи)</footer>
 </body>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const rows = document.querySelectorAll(".clickable-row");
+
+  rows.forEach(row => {
+    row.addEventListener("click", () => {
+      window.location.href = row.dataset.href;
+    });
+  });
+});
+</script>
+
+<style>
+.clickable-row {
+  cursor: pointer;
+}
+.clickable-row:hover {
+  background-color: #f5f5f5;
+}
+</style>
 </html>

@@ -9,7 +9,7 @@
     <table>
     {% for stat in stats %}
         {% if not stat.game.relateOnId %}
-        <tr>
+        <tr class="clickable-row" data-href="/games/{{stat.game.name}}">
             <td>{% include "avatar.html" with avatar=stat.game.image only%}</td>
             <td>{{ stat.game.name }}</td>
             <td>{{ stat.MMR }} MMR</td>

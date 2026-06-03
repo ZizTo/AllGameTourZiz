@@ -50,7 +50,7 @@ def profile_view(request, usname):
     return render(request, "profile.html", context)
 
 
-MAX_ON_PAGE = 3
+MAX_ON_PAGE = 5
 
 def all_profiles_view(request):
     search = request.GET.get('search', '')

@@ -1,22 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Крутые челики{% endblock %}
+{% block title %}Все игры{% endblock %}
 
 {% block content %}
     <form method="GET">
         <input type="text" name="search" value="{{search}}">
         <input type="submit" value="Send">
     </form>
-    <p>Крутые челики</p>
+    <p>Все игры</p>
     <table>
-    {% for oneuser in allusers %}
-        <tr class="clickable-row" data-href="/users/{{oneuser.username}}">
-            <td>{% include "avatar.html" with avatar=oneuser.avatar only%}</td>
-            <td>{{ oneuser.username }}</td>
-            <td>{{ oneuser.MMR }} MMR</td>
+    {% for onegame in allgames %}
+        <tr class="clickable-row" data-href="/games/{{onegame.name}}">
+            <td>{% include "avatar.html" with avatar=onegame.image only%}</td>
+            <td>{{ onegame.name }}</td>
         </tr>
     {% empty %}
-        <tr><td>Нет типов(((</td></tr>
+        <tr><td>Нет игр(((</td></tr>
     {% endfor %}
     </table>
     {% if prevpage %}<a href="{{ prevpage }}">Назад</a> {% endif %}

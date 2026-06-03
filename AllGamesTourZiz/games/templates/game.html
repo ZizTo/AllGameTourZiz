@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ game.name }}{% endblock %}
+
+{% block content %}
+    {% include "avatar.html" with avatar=game.image only%}
+    <p>{{ game.name }}</p>
+    <p>{{ game.description }}</p>
+    <p>Режимы игры</p>
+    <table>
+    {% for undergame in undergames %}
+        <tr class="clickable-row" data-href="/games/{{undergame.name}}">
+            <td>{% include "avatar.html" with avatar=undergame.image only%}</td>
+            <td>{{ undergame.name }}</td>
+            <td>{{ undergame.description }}</td>
+        </tr>
+    {% empty %}
+        <tr><td>А нет режимов, вот так вот(((</td></tr>
+    {% endfor %}
+    </table>
+    <p>Топ типов</p>
+    <table>
+    {% for oneuser in users %}
+        <tr class="clickable-row" data-href="/users/{{oneuser.user__username}}">
+            <td>{% include "avatar.html" with avatar=oneuser.user__avatar only%}</td>
+            <td>{{ oneuser.user__username }}</td>
+            <td>{{ oneuser.MMR }} MMR</td>
+        </tr>
+    {% empty %}
+        <tr><td>Нет игрунов(((</td></tr>
+    {% endfor %}
+    </table>
+{% endblock %}

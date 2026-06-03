@@ -1,7 +1,6 @@
 from django.db import models
 
 
-# Create your models here.
 class Game(models.Model):
     name = models.CharField()
     description = models.CharField(blank=True, null=True)
