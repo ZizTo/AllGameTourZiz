@@ -29,6 +29,7 @@ class SessionParticipants(models.Model):
     numberInSession = models.PositiveIntegerField(default=0)  # Two or more in one is Team
     points = models.PositiveIntegerField(null=True, blank=True)  # use somthing
     time = models.DurationField(null=True, blank=True)           # from this two
+    mmrChange = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username} | {self.session.uniqueCode}"

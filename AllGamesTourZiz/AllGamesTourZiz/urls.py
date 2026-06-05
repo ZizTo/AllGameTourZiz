@@ -25,6 +25,7 @@ urlpatterns = [
     path('', RedirectView.as_view(url='/users/', permanent=False)),
     path('users/', include('users.urls')),
     path('games/', include('games.urls')),
+    path('sessions/', include('playSessions.urls')),
     path('admin/', admin.site.urls),
 ]
 

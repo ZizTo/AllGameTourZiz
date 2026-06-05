@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}{{ gamename }}{% endblock %}
+
+{% block content %}
+    <p>Сессия игры </p>
+    <table>
+        <tr class="clickable-row" data-href="/games/{{gamename}}">
+            <td>{% include "avatar.html" with avatar=gameimage width=70 height=70 only%}</td>
+            <td>{{ gamename }}</td>
+        </tr>
+    </table>
+    {% if not adminteams %} <p>Статус: {% if status == 0 %}Не начата
+            {% elif status == 1 %}Игра идёт
+            {% elif status == 2 %}Отменена
+            {% elif status == 3 %}Ничья
+            {% else %}Победа команды {{ winner }}{% endif %}
+    </p> {% else %}
+    <form method="POST" action="/sessions/{{uniqueCode}}/status/">
+        {% csrf_token %}
+        <select id="newstatus" name="newstatus">
+            <option value="0">Не начато</option>
+            <option value="1">Игра идёт</option>
+            <option value="2">Отменён</option>
+            <option value="3">Ничья</option>
+            {% for option in adminteams %}
+            <option value="{{option.value}}">{{option.team}}</option>
+            {% endfor %}
+        </select>
+        <input type="submit" value="Send" >
+    </form>
+    {% endif %}
+
+    <p>Все команды</p>
+    {% for team in teams %}
+    <p>Команда {{ team.number.text }} {{ team.results.text }}
+        {% if adminteams %}
+        <form method="POST" action="/sessions/{{ uniqueCode }}/{{ team.number.value }}/">
+            {% csrf_token %}
+            <input type="number" id="points" name="points"
+                   {% if team.results.isPoints %}value="{{team.results.value}}"{% endif %}>
+            <input class="html-duration-picker" id="time" name="time"
+                   {% if not team.results.isPoints %} data-duration="{{team.results.value}}"{% endif %}>
+            <input type="submit" value="Send" >
+        </form>
+        {% endif %}
+    </p>
+    <table>
+        {% for player in team.players %}
+        <tr class="clickable-row" data-href="/users/{{player.name}}">
+            <td>{% include "avatar.html" with avatar=player.image only%}</td>
+            <td>{{ player.name }}</td>
+            <td>{{ player.MMR }} MMR</td>
+            {% if player.mmrChange is not None %}<td>
+            {% if player.mmrChange >= 0 %}+{% endif %}{{ player.mmrChange }} MMR
+            </td> {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td>Няма игроков(((</td></tr>
+        {% endfor %}
+    </table>
+    {% empty %}
+    <p>Няма команд(((</p>
+    {% endfor %}
+
+{% endblock %}
+
+{% block additional_scripts %}
+
+document.getElementById("newstatus").value = {{status}}
+
+{% endblock %}

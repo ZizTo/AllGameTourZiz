@@ -37,7 +37,7 @@ def all_games_view(request):
 def game_view(request, gamename):
     games = Game.objects.filter(name=gamename)
     if not games.exists():
-        return render(request, "errors/user_not_found.html", {"user": request.user})
+        return render(request, "errors/game_not_found.html", {"user": request.user})
 
     game = games.first()
     context = {"user": request.user}
@@ -46,5 +46,8 @@ def game_view(request, gamename):
     users = game.gamestats_set.order_by("-MMR")[0:MAX_ON_PAGE]
     context['users'] = users.values("user__username", "user__avatar", "MMR")
     context['undergames'] = game.game_set.all().values("name", "image", "description")
+    if game.relateOnId is not None:
+        context['upgamename'] = game.relateOnId.name
+        context['upgameimage'] = game.relateOnId.image
 
     return render(request, "game.html", context)

@@ -3,17 +3,34 @@
 {% block title %}Сессии{% endblock %}
 
 {% block content %}
+    <p>Поиск по игре</p>
     <form method="GET">
         <input type="text" name="search" value="{{search}}">
         <input type="submit" value="Send">
     </form>
-    <p>Крутые челики</p>
+    <p>Все игровые сессии</p>
     <table>
-    {% for oneuser in allusers %}
-        <tr class="clickable-row" data-href="/users/{{oneuser.username}}">
-            <td>{% include "avatar.html" with avatar=oneuser.avatar only%}</td>
-            <td>{{ oneuser.username }}</td>
-            <td>{{ oneuser.MMR }} MMR</td>
+    {% for session in allsessions %}
+        <tr class="clickable-row" data-href="/sessions/{{session.uniqueCode}}">
+            {% if session.player1name %}
+            <td>{% include "avatar.html" with avatar=session.player1avatar width=70 height=70 only%}</td>
+            <td>{{ session.player1name }}</td>
+            {% if session.player2name %}
+            <td>VS</td>
+            <td>{% include "avatar.html" with avatar=session.player2avatar width=70 height=70 only%}</td>
+            <td>{{ session.player2name }}</td>
+            {% if session.player3exists %}
+            <td>VS...</td>
+            {% endif %}
+            {% endif %}
+            {% endif %}
+            <td>{{session.gamename}} </td>
+            <td>{% include "avatar.html" with avatar=session.gameimage width=100 height=100 only%} </td>
+            {% if session.status == 0 %}<td>Не начата</td>
+            {% elif session.status == 1 %}<td>Игра идёт</td>
+            {% elif session.status == 2 %}<td>Отменена</td>
+            {% elif session.status == 3 %}<td>Ничья</td>
+            {% else %}<td>Завершено</td>{% endif %}
         </tr>
     {% empty %}
         <tr><td>Нет типов(((</td></tr>
