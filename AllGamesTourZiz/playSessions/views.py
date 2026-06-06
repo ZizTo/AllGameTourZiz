@@ -17,49 +17,47 @@ def all_sessions_view(request):
     if not bool(re.match(r"^[a-zA-Z0-9 ]+$", search)) or len(search) > 20:
         search = ''
 
-    searchparam = f"/sessions/?search={search}" if search else "/sessions/"
+    new_link = f"/sessions/?search={search}" if search else "/sessions/"
+
+    filtered_sessions = PlaySession.objects.filter(game__name__icontains=search).order_by("created_at")
     try:
         page = int(request.GET.get("page", 1))
-        lastpage = math.floor(
-            ((PlaySession.objects.filter(game__name__icontains=search).count() - 1) / MAX_ON_PAGE) + 1)
+        lastpage = math.floor(((filtered_sessions.count() - 1) / MAX_ON_PAGE) + 1)
         if page < 1 or page > lastpage:
-            return HttpResponseRedirect(searchparam)
+            raise
     except:
-        return HttpResponseRedirect(searchparam)
+        return HttpResponseRedirect(new_link)
 
     context = {"user": request.user, 'page': page}
     if page > 1:
-        context['prevpage'] = searchparam + (f'&page={page - 1}' if search else f"?page={page - 1}")
+        context['prevpage'] = new_link + (f'&page={page - 1}' if search else f"?page={page - 1}")
     if page < lastpage:
-        context['nextpage'] = searchparam + (f'&page={page + 1}' if search else f"?page={page + 1}")
+        context['nextpage'] = new_link + (f'&page={page + 1}' if search else f"?page={page + 1}")
     if search != '':
         context['search'] = search
 
-    filtredsessions = PlaySession.objects.filter(game__name__icontains=search)[
-                      (page - 1) * MAX_ON_PAGE:page * MAX_ON_PAGE]
+    filtredsessions = filtered_sessions[(page - 1) * MAX_ON_PAGE:page * MAX_ON_PAGE]
 
-    context['allsessions'] = filtredsessions.values("uniqueCode", "status")
+    context['allsessions'] = filtredsessions.values("uniqueCode", "status", "game__name", "game__image")
 
     for i in range(len(context['allsessions'])):
-        context['allsessions'][i]['gamename'] = filtredsessions[i].game.name
-        context['allsessions'][i]['gameimage'] = filtredsessions[i].game.image
+        this_session_participants = SessionParticipants.objects.filter(session=filtredsessions[i])
 
-        player1 = SessionParticipants.objects.filter(session=filtredsessions[i], numberInSession=0).first()
+        player1 = this_session_participants.filter(numberInSession=0).first()
         if player1 is None:
             continue
 
-        context['allsessions'][i]['player1name'] = player1.user.username  # .values("username", "avatar")
-        context['allsessions'][i]['player1avatar'] = player1.user.avatar  # .values("username", "avatar")
-        player2 = SessionParticipants.objects.filter(session=filtredsessions[i], numberInSession=1).first()
+        context['allsessions'][i]['player1name'] = player1.user.username
+        context['allsessions'][i]['player1avatar'] = player1.user.avatar
+        player2 = this_session_participants.filter(numberInSession=1).first()
 
         if player2 is None:
             continue
 
-        context['allsessions'][i]['player2name'] = player2.user.username  # .values("username", "avatar")
-        context['allsessions'][i]['player2avatar'] = player2.user.avatar  # .values("username", "avatar")
+        context['allsessions'][i]['player2name'] = player2.user.username
+        context['allsessions'][i]['player2avatar'] = player2.user.avatar
 
-        context['allsessions'][i]['player3exists'] = SessionParticipants.objects.filter(session=filtredsessions[i],
-                                                                                        numberInSession=2).exists()
+        context['allsessions'][i]['player3exists'] = this_session_participants.filter(numberInSession=2).exists()
 
     return render(request, "allsessions.html", context)
 
@@ -70,12 +68,10 @@ def session_view(request, sessionid):
         return render(request, "errors/session_not_found.html", {"user": request.user})
 
     session = sessions.first()
-    context = {"user": request.user}
+    context = {"user": request.user,
+               'gamename': session.game.name, 'gameimage': session.game.image,
+               'status': session.status, 'uniqueCode': session.uniqueCode}
 
-    context['gamename'] = session.game.name
-    context['gameimage'] = session.game.image
-    context['status'] = session.status
-    context['uniqueCode'] = session.uniqueCode
     participants = SessionParticipants.objects.filter(session=session).order_by("-numberInSession")
 
     teams = []

@@ -24,8 +24,8 @@
             {% endif %}
             {% endif %}
             {% endif %}
-            <td>{{session.gamename}} </td>
-            <td>{% include "avatar.html" with avatar=session.gameimage width=100 height=100 only%} </td>
+            <td>{{session.game__name}} </td>
+            <td>{% include "avatar.html" with avatar=session.game__image width=100 height=100 only%} </td>
             {% if session.status == 0 %}<td>Не начата</td>
             {% elif session.status == 1 %}<td>Игра идёт</td>
             {% elif session.status == 2 %}<td>Отменена</td>
@@ -33,7 +33,7 @@
             {% else %}<td>Завершено</td>{% endif %}
         </tr>
     {% empty %}
-        <tr><td>Нет типов(((</td></tr>
+        <tr><td>Нет сессий(((</td></tr>
     {% endfor %}
     </table>
     {% if prevpage %}<a href="{{ prevpage }}">Назад</a> {% endif %}
