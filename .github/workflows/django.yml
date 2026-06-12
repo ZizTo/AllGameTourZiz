@@ -3,12 +3,11 @@
 #
 # Для self-hosted раннера:
 #   1. Установи GitHub Actions Runner: Settings > Actions > Runners > New > Windows
-#   2. Поменяй runs-on ниже на свой лейбл, например:
-#      runs-on: [self-hosted, windows, tourziz]
-#   3. Python 3.14 должен быть в PATH (python --version)
+#   2. Поменяй runs-on ниже на свой лейбл
+#   3. Python в PATH (python --version)
 #   4. Порт 8000 открыт в фаерволе
 #
-# settings.py (поменяй ручками):
+# settings.py:
 #   ALLOWED_HOSTS = ["*"]
 
 name: TourZiz Deploy
@@ -33,27 +32,28 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Verify Python
-        shell: cmd
+        shell: powershell
         run: |
           python --version
           python -m pip --version
 
       - name: Install dependencies
-        shell: cmd
-        run: python -m pip install -r "${{ env.PROJECT_DIR }}\requirements.txt"
+        shell: powershell
+        working-directory: ./${{ env.PROJECT_DIR }}
+        run: python -m pip install -r requirements.txt
 
-      - name: Django system checks
-        shell: cmd
+      - name: Django checks
+        shell: powershell
         working-directory: ./${{ env.PROJECT_DIR }}
         run: python manage.py check
 
-      - name: Check pending migrations
-        shell: cmd
+      - name: Pending migrations
+        shell: powershell
         working-directory: ./${{ env.PROJECT_DIR }}
         run: python manage.py makemigrations --check --dry-run
 
       - name: Apply migrations
-        shell: cmd
+        shell: powershell
         working-directory: ./${{ env.PROJECT_DIR }}
         run: python manage.py migrate --noinput
 
@@ -76,13 +76,12 @@ jobs:
             Remove-Item $pidFile -Force
           }
 
-          $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-          foreach ($c in $conns) {
+          Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | ForEach-Object {
             try {
-              Stop-Process -Id $c.OwningProcess -Force -ErrorAction Stop
-              Write-Host "Killed port $port, PID=$($c.OwningProcess)"
+              Stop-Process -Id $_.OwningProcess -Force -ErrorAction Stop
+              Write-Host "Killed port $port, PID=$($_.OwningProcess)"
             } catch {
-              Write-Host "Could not kill PID=$($c.OwningProcess)"
+              Write-Host "Could not kill PID=$($_.OwningProcess)"
             }
           }
 
@@ -94,20 +93,39 @@ jobs:
           $projectDir = "${{ github.workspace }}\${{ env.PROJECT_DIR }}"
           $pidFile = "${{ github.workspace }}\${{ env.PID_FILE }}"
           $port = ${{ env.PORT }}
+          $logDir = "${{ github.workspace }}\logs"
+          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+          $stdout = "$logDir\server_stdout.log"
+          $stderr = "$logDir\server_stderr.log"
 
           $proc = Start-Process python `
             -ArgumentList "-m", "waitress", "--port=$port", "--host=0.0.0.0", "AllGamesTourZiz.wsgi:application" `
             -WorkingDirectory $projectDir `
+            -RedirectStandardOutput $stdout `
+            -RedirectStandardError $stderr `
             -WindowStyle Hidden `
             -PassThru
 
-          if (-not $proc) {
-            Write-Host "Failed to start server"
+          if (-not $proc) { Write-Host "Failed to start"; exit 1 }
+
+          $proc.Id | Out-File -FilePath $pidFile -NoNewline
+          Write-Host "Server PID=$($proc.Id), logs -> $logDir"
+          Write-Host "stdout: $stdout"
+          Write-Host "stderr: $stderr"
+
+          Start-Sleep -Seconds 4
+
+          if ($proc.HasExited) {
+            Write-Host "SERVER CRASHED IMMEDIATELY (exit code $($proc.ExitCode))"
+            Write-Host "=== STDERR ==="
+            if (Test-Path $stderr) { Get-Content $stderr | Write-Host }
+            Write-Host "=== STDOUT ==="
+            if (Test-Path $stdout) { Get-Content $stdout | Write-Host }
             exit 1
           }
 
-          $proc.Id | Out-File -FilePath $pidFile -NoNewline
-          Write-Host "Server started on port $port, PID=$($proc.Id)"
+          Write-Host "Process still alive after 4s, good."
 
       - name: Verify deployment
         shell: powershell
@@ -116,11 +134,15 @@ jobs:
             Write-Host "Health check $i/10..."
             try {
               $r = Invoke-WebRequest -Uri "http://localhost:${{ env.PORT }}/" -TimeoutSec 5 -UseBasicParsing
-              Write-Host "DEPLOY SUCCESS! HTTP $($r.StatusCode)"
+              Write-Host "DEPLOY OK — HTTP $($r.StatusCode)"
               exit 0
-            } catch {
-              Start-Sleep -Seconds 3
-            }
+            } catch { Start-Sleep -Seconds 3 }
           }
-          Write-Host "Server did not respond."
+
+          Write-Host "Server not responding. Dumping logs:"
+          $logDir = "${{ github.workspace }}\logs"
+          Write-Host "=== STDERR ==="
+          if (Test-Path "$logDir\server_stderr.log") { Get-Content "$logDir\server_stderr.log" | Write-Host }
+          Write-Host "=== STDOUT (last 50 lines) ==="
+          if (Test-Path "$logDir\server_stdout.log") { Get-Content "$logDir\server_stdout.log" -Tail 50 | Write-Host }
           exit 1
