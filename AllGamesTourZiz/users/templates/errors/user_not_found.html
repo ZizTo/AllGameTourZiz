@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Пользователь не найден {% endblock %}
+{% block title %}Не найдено — TourZiz{% endblock %}
 
 {% block content %}
-    <p>Нет такого типа(</p>
+<div class="error-page">
+    <h1>404</h1>
+    <p>Нет такого типа</p>
+    <a href="/users/" class="btn btn-primary">Все игроки</a>
+</div>
 {% endblock %}

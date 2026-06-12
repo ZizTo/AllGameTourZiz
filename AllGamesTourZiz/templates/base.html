@@ -1,48 +1,71 @@
 <!DOCTYPE html>
 {% load static %}
-<html>
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
-    <title>{% block title %}Default title{% endblock title %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}AllGameTourZiz{% endblock title %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
 </head>
 <body>
-    <header>
-        <a href="/users/">Игроки</a> | <a href="/games/">Игры</a> | <a href="/sessions/">Сессии</a> |
-        {% if user.is_authenticated %} <a href="/users/{{ user.username }}">{{ user.username }}</a>
-        | <a href="/users/login">Выйти с акка</a>
-        {% else %} <a href="/users/login/">Войти</a>
+
+<header class="header">
+    <a href="/" class="header-brand">TOUR<span>ZIZ</span></a>
+
+    <nav>
+        <ul class="header-nav">
+            <li>
+                <a href="/users/"
+                   class="{% if '/users/' in request.path and 'login' not in request.path %}nav-active{% endif %}">
+                    Игроки
+                </a>
+            </li>
+            <li>
+                <a href="/games/"
+                   class="{% if '/games/' in request.path %}nav-active{% endif %}">
+                    Игры
+                </a>
+            </li>
+            <li>
+                <a href="/sessions/"
+                   class="{% if '/sessions/' in request.path %}nav-active{% endif %}">
+                    Сессии
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="header-user">
+        {% if user.is_authenticated %}
+            <a href="/users/{{ user.username }}">{{ user.username }}</a>
+            <a href="/users/login">Выйти</a>
+        {% else %}
+            <a href="/users/login/">Войти</a>
         {% endif %}
-    </header>
+    </div>
+</header>
 
-    <div>{% block content%}Тут что-то будет{% endblock content %}</div>
+<main class="main">
+    {% block content %}{% endblock content %}
+</main>
 
-    <footer>Привет от зизи)</footer>
-</body>
+<footer class="footer">
+    AllGameTourZiz &copy; {% now "Y" %}
+</footer>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const rows = document.querySelectorAll(".clickable-row");
-
-  rows.forEach(row => {
-    row.addEventListener("click", () => {
-      window.location.href = row.dataset.href;
+    const rows = document.querySelectorAll(".clickable-row");
+    rows.forEach(row => {
+        row.addEventListener("click", () => {
+            window.location.href = row.dataset.href;
+        });
     });
-  });
 });
-
 {% block additional_scripts %}{% endblock additional_scripts %}
 </script>
 
+<script src="{% static 'scripts/html-duration-picker.min.js' %}"></script>
+
 </body>
-
-<script src="{% static  "scripts/html-duration-picker.min.js" %} "></script>
-
-<style>
-.clickable-row {
-  cursor: pointer;
-}
-.clickable-row:hover {
-  background-color: #f5f5f5;
-}
-</style>
 </html>

@@ -1,43 +1,52 @@
 {% extends "base.html" %}
 
-{% block title %}Сессии{% endblock %}
+{% block title %}Сессии — TourZiz{% endblock %}
 
 {% block content %}
-    <p>Поиск по игре</p>
-    <form method="GET">
-        <input type="text" name="search" value="{{search}}">
-        <input type="submit" value="Send">
+    <form method="GET" class="search-bar">
+        <input type="text"
+               name="search"
+               value="{{ search }}"
+               placeholder="Поиск по игре..."
+               class="search-input" />
+        <button type="submit" class="btn btn-primary">Поиск</button>
     </form>
-    <p>Все игровые сессии</p>
-    <table>
-    {% for session in allsessions %}
-        <tr class="clickable-row" data-href="/sessions/{{session.uniqueCode}}">
-            {% if session.player1name %}
-            <td>{% include "avatar.html" with avatar=session.player1avatar width=70 height=70 only%}</td>
-            <td>{{ session.player1name }}</td>
-            {% if session.player2name %}
-            <td>VS</td>
-            <td>{% include "avatar.html" with avatar=session.player2avatar width=70 height=70 only%}</td>
-            <td>{{ session.player2name }}</td>
-            {% if session.player3exists %}
-            <td>VS...</td>
-            {% endif %}
-            {% endif %}
-            {% endif %}
-            <td>{{session.game__name}} </td>
-            <td>{% include "avatar.html" with avatar=session.game__image width=100 height=100 only%} </td>
-            {% if session.status == 0 %}<td>Не начата</td>
-            {% elif session.status == 1 %}<td>Игра идёт</td>
-            {% elif session.status == 2 %}<td>Отменена</td>
-            {% elif session.status == 3 %}<td>Ничья</td>
-            {% else %}<td>Завершено</td>{% endif %}
-        </tr>
-    {% empty %}
-        <tr><td>Нет сессий(((</td></tr>
-    {% endfor %}
-    </table>
-    {% if prevpage %}<a href="{{ prevpage }}">Назад</a> {% endif %}
-    Страница {{page}}
-    {% if nextpage %}<a href="{{ nextpage }}">Вперёд</a> {% endif %}
 
+    <div class="section-title">Сессии</div>
+
+    {% for session in allsessions %}
+    <div class="card-row clickable-row" data-href="/sessions/{{ session.uniqueCode }}">
+        {% if session.player1name %}
+        {% include "avatar.html" with avatar=session.player1avatar class="card-row-avatar" only %}
+        <span style="font-size:13px;font-weight:500;flex-shrink:0;">{{ session.player1name }}</span>
+        {% if session.player2name %}
+        <span class="vs">VS</span>
+        {% include "avatar.html" with avatar=session.player2avatar class="card-row-avatar" only %}
+        <span style="font-size:13px;font-weight:500;flex-shrink:0;">{{ session.player2name }}</span>
+        {% if session.player3exists %}
+        <span class="vs">VS...</span>
+        {% endif %}
+        {% endif %}
+        {% endif %}
+        <div class="card-row-body">
+            <div class="card-row-title">{{ session.game__name }}</div>
+            {% include "avatar.html" with avatar=session.game__image class="card-row-avatar" width=28 height=28 only %}
+        </div>
+        <div class="card-row-meta" style="text-align:right;">
+            {% if session.status == 0 %}<span class="badge badge-not-started">Не начата</span>
+            {% elif session.status == 1 %}<span class="badge badge-live">Идёт</span>
+            {% elif session.status == 2 %}<span class="badge badge-cancelled">Отменена</span>
+            {% elif session.status == 3 %}<span class="badge badge-draw">Ничья</span>
+            {% else %}<span class="badge badge-done">Завершено</span>{% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state">Нет сессий</div>
+    {% endfor %}
+
+    <div class="pagination">
+        {% if prevpage %}<a href="{{ prevpage }}">← Назад</a>{% endif %}
+        <span class="current">Страница {{ page }}</span>
+        {% if nextpage %}<a href="{{ nextpage }}">Вперёд →</a>{% endif %}
+    </div>
 {% endblock %}

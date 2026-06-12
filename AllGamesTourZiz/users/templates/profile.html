@@ -1,51 +1,61 @@
 {% extends "base.html" %}
 
-{% block title %}{{ viewuser.username }} профиль{% endblock %}
+{% block title %}{{ viewuser.username }} — TourZiz{% endblock %}
 
 {% block content %}
-    {% include "avatar.html" with avatar=viewuser.avatar only%}
-    <p>{{ viewuser.username }}</p>
-    <p>{{ viewuser.MMR }} MMR</p>
-    <p>Игры</p>
-    <table>
+    <div class="profile-header">
+        {% include "avatar.html" with avatar=viewuser.avatar class="profile-avatar" only %}
+        <div class="profile-info">
+            <h1>{{ viewuser.username }}</h1>
+            <div class="mmr">{{ viewuser.MMR }} MMR</div>
+        </div>
+    </div>
+
+    <div class="section-title">Игры</div>
     {% for stat in stats %}
         {% if not stat.game.relateOnId %}
-        <tr class="clickable-row" data-href="/games/{{stat.game.name}}">
-            <td>{% include "avatar.html" with avatar=stat.game.image only%}</td>
-            <td>{{ stat.game.name }}</td>
-            <td>{{ stat.MMR }} MMR</td>
-        </tr>
+        <div class="card-row clickable-row" data-href="/games/{{ stat.game.name }}">
+            {% include "avatar.html" with avatar=stat.game.image class="card-row-avatar" only %}
+            <div class="card-row-body">
+                <div class="card-row-title">{{ stat.game.name }}</div>
+            </div>
+            <div class="card-row-meta">
+                <div class="value">{{ stat.MMR }}</div>
+                <div class="label">MMR</div>
+            </div>
+        </div>
         {% endif %}
     {% empty %}
-        <tr><td>Не игрун этот игрок</td></tr>
+    <div class="empty-state">Не игрун этот игрок</div>
     {% endfor %}
-    </table>
-    <p>Сессии</p>
-    <table>
+
+    <div class="section-title">Сессии</div>
     {% for session in allsessions %}
-        <tr class="clickable-row" data-href="/sessions/{{session.session__uniqueCode}}">
-            {% if session.player1name %}
-            <td>{% include "avatar.html" with avatar=session.player1avatar width=70 height=70 only%}</td>
-            <td>{{ session.player1name }}</td>
-            {% if session.player2name %}
-            <td>VS</td>
-            <td>{% include "avatar.html" with avatar=session.player2avatar width=70 height=70 only%}</td>
-            <td>{{ session.player2name }}</td>
-            {% if session.player3exists %}
-            <td>VS...</td>
-            {% endif %}
-            {% endif %}
-            {% endif %}
-            <td>{{session.session__game__name}} </td>
-            <td>{% include "avatar.html" with avatar=session.session__game__image width=100 height=100 only%} </td>
-            {% if session.session__status == 0 %}<td>Не начата</td>
-            {% elif session.session__status == 1 %}<td>Игра идёт</td>
-            {% elif session.session__status == 2 %}<td>Отменена</td>
-            {% elif session.session__status == 3 %}<td>Ничья</td>
-            {% else %}<td>Завершено</td>{% endif %}
-        </tr>
+    <div class="card-row clickable-row" data-href="/sessions/{{ session.session__uniqueCode }}">
+        {% if session.player1name %}
+        {% include "avatar.html" with avatar=session.player1avatar class="card-row-avatar" only %}
+        <span style="font-size:13px;font-weight:500;flex-shrink:0;">{{ session.player1name }}</span>
+        {% if session.player2name %}
+        <span class="vs">VS</span>
+        {% include "avatar.html" with avatar=session.player2avatar class="card-row-avatar" only %}
+        <span style="font-size:13px;font-weight:500;flex-shrink:0;">{{ session.player2name }}</span>
+        {% if session.player3exists %}
+        <span class="vs">VS...</span>
+        {% endif %}
+        {% endif %}
+        {% endif %}
+        <div class="card-row-body">
+            <div class="card-row-title">{{ session.session__game__name }}</div>
+        </div>
+        <div class="card-row-meta" style="text-align:right;">
+            {% if session.session__status == 0 %}<span class="badge badge-not-started">Не начата</span>
+            {% elif session.session__status == 1 %}<span class="badge badge-live">Идёт</span>
+            {% elif session.session__status == 2 %}<span class="badge badge-cancelled">Отменена</span>
+            {% elif session.session__status == 3 %}<span class="badge badge-draw">Ничья</span>
+            {% else %}<span class="badge badge-done">Завершено</span>{% endif %}
+        </div>
+    </div>
     {% empty %}
-        <tr><td>Нет сессий(((</td></tr>
+    <div class="empty-state">Нет сессий</div>
     {% endfor %}
-    </table>
 {% endblock %}

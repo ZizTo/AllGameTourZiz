@@ -1,15 +1,14 @@
-<!-- use include "avatar.html" with avatar=stat.game.image width=200 height=100 only -->
 {% load static %}
 {% if not avatar %}
-<img src="{% static "images/avatarplaceholder.png" %}"
-    {% if not width or not height %} width="100" height="100"
-    {% else %} width="{{width}}" height="{{height}}"
-    {% endif %}
->
+<img src="{% static 'images/avatarplaceholder.png' %}"
+    {% if width %}width="{{ width }}"{% else %}width="100"{% endif %}
+    {% if height %}height="{{ height }}"{% else %}height="100"{% endif %}
+    class="{% if class %}{{ class }}{% endif %}"
+    alt="avatar" />
 {% else %}
 <img src="/media/{{ avatar }}"
-    {% if not width or not height %} width="100" height="100"
-    {% else %} width="{{width}}" height="{{height}}"
-    {% endif %}
->
+    {% if width %}width="{{ width }}"{% else %}width="100"{% endif %}
+    {% if height %}height="{{ height }}"{% else %}height="100"{% endif %}
+    class="{% if class %}{{ class }}{% endif %}"
+    alt="avatar" />
 {% endif %}

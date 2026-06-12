@@ -1,25 +1,33 @@
 {% extends "base.html" %}
 
-{% block title %}Все игры{% endblock %}
+{% block title %}Игры — TourZiz{% endblock %}
 
 {% block content %}
-    <form method="GET">
-        <input type="text" name="search" value="{{search}}">
-        <input type="submit" value="Send">
+    <form method="GET" class="search-bar">
+        <input type="text"
+               name="search"
+               value="{{ search }}"
+               placeholder="Поиск по названию..."
+               class="search-input" />
+        <button type="submit" class="btn btn-primary">Поиск</button>
     </form>
-    <p>Все игры</p>
-    <table>
-    {% for onegame in allgames %}
-        <tr class="clickable-row" data-href="/games/{{onegame.name}}">
-            <td>{% include "avatar.html" with avatar=onegame.image only%}</td>
-            <td>{{ onegame.name }}</td>
-        </tr>
-    {% empty %}
-        <tr><td>Нет игр(((</td></tr>
-    {% endfor %}
-    </table>
-    {% if prevpage %}<a href="{{ prevpage }}">Назад</a> {% endif %}
-    Страница {{page}}
-    {% if nextpage %}<a href="{{ nextpage }}">Вперёд</a> {% endif %}
 
+    <div class="section-title">Игры</div>
+
+    {% for onegame in allgames %}
+    <div class="card-row clickable-row" data-href="/games/{{ onegame.name }}">
+        {% include "avatar.html" with avatar=onegame.image class="card-row-avatar" only %}
+        <div class="card-row-body">
+            <div class="card-row-title">{{ onegame.name }}</div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state">Нет игр</div>
+    {% endfor %}
+
+    <div class="pagination">
+        {% if prevpage %}<a href="{{ prevpage }}">← Назад</a>{% endif %}
+        <span class="current">Страница {{ page }}</span>
+        {% if nextpage %}<a href="{{ nextpage }}">Вперёд →</a>{% endif %}
+    </div>
 {% endblock %}

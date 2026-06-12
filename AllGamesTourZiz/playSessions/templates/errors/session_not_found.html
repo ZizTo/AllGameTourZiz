@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Сессия не найдена {% endblock %}
+{% block title %}Не найдено — TourZiz{% endblock %}
 
 {% block content %}
-    <p>Нет такой сессии(</p>
+<div class="error-page">
+    <h1>404</h1>
+    <p>Нет такой сессии</p>
+    <a href="/sessions/" class="btn btn-primary">Все сессии</a>
+</div>
 {% endblock %}

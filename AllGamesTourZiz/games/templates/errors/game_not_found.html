@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Игра не найдена {% endblock %}
+{% block title %}Не найдено — TourZiz{% endblock %}
 
 {% block content %}
-    <p>Игра не найдена(</p>
+<div class="error-page">
+    <h1>404</h1>
+    <p>Игра не найдена</p>
+    <a href="/games/" class="btn btn-primary">Все игры</a>
+</div>
 {% endblock %}

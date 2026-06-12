@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Ты не админ{% endblock %}
+{% block title %}Нет доступа — TourZiz{% endblock %}
 
 {% block content %}
-    <p>Не, чел, ты не админ, нельзя тебе такое делать(</p>
+<div class="error-page">
+    <h1>403</h1>
+    <p>Ты не админ, нельзя тебе такое делать</p>
+    <a href="/" class="btn btn-primary">На главную</a>
+</div>
 {% endblock %}

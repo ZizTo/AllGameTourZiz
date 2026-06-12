@@ -1,26 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}Крутые челики{% endblock %}
+{% block title %}Игроки — TourZiz{% endblock %}
 
 {% block content %}
-    <form method="GET">
-        <input type="text" name="search" value="{{search}}">
-        <input type="submit" value="Send">
+    <form method="GET" class="search-bar">
+        <input type="text"
+               name="search"
+               value="{{ search }}"
+               placeholder="Поиск по нику..."
+               class="search-input" />
+        <button type="submit" class="btn btn-primary">Поиск</button>
     </form>
-    <p>Крутые челики</p>
-    <table>
-    {% for oneuser in allusers %}
-        <tr class="clickable-row" data-href="/users/{{oneuser.username}}">
-            <td>{% include "avatar.html" with avatar=oneuser.avatar only%}</td>
-            <td>{{ oneuser.username }}</td>
-            <td>{{ oneuser.MMR }} MMR</td>
-        </tr>
-    {% empty %}
-        <tr><td>Нет типов(((</td></tr>
-    {% endfor %}
-    </table>
-    {% if prevpage %}<a href="{{ prevpage }}">Назад</a> {% endif %}
-    Страница {{page}}
-    {% if nextpage %}<a href="{{ nextpage }}">Вперёд</a> {% endif %}
 
+    <div class="section-title">Игроки</div>
+
+    {% for oneuser in allusers %}
+    <div class="card-row clickable-row" data-href="/users/{{ oneuser.username }}">
+        {% include "avatar.html" with avatar=oneuser.avatar class="card-row-avatar" only %}
+        <div class="card-row-body">
+            <div class="card-row-title">{{ oneuser.username }}</div>
+        </div>
+        <div class="card-row-meta">
+            <div class="value">{{ oneuser.MMR }}</div>
+            <div class="label">MMR</div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state">Нет игроков</div>
+    {% endfor %}
+
+    <div class="pagination">
+        {% if prevpage %}<a href="{{ prevpage }}">← Назад</a>{% endif %}
+        <span class="current">Страница {{ page }}</span>
+        {% if nextpage %}<a href="{{ nextpage }}">Вперёд →</a>{% endif %}
+    </div>
 {% endblock %}
