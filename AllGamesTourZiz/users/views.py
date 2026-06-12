@@ -89,7 +89,7 @@ def all_profiles_view(request):
     try:
         page = int(request.GET.get("page", 1))
         lastpage = math.floor(((filtered_users.count() - 1) / MAX_ON_PAGE) + 1)
-        if page < 1 or page > lastpage:
+        if page < 0 or page > lastpage:
             return HttpResponseRedirect(new_link)
     except:
         return HttpResponseRedirect(new_link)
