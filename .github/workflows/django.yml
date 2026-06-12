@@ -60,7 +60,7 @@ jobs:
       - name: Stop old server
         shell: powershell
         run: |
-          $pidFile = "${{ github.workspace }}\${{ env.PID_FILE }}"
+          $pidFile = Join-Path "${{ github.workspace }}" "${{ env.PID_FILE }}"
           $port = ${{ env.PORT }}
 
           if (Test-Path $pidFile) {
@@ -79,7 +79,7 @@ jobs:
           Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | ForEach-Object {
             try {
               Stop-Process -Id $_.OwningProcess -Force -ErrorAction Stop
-              Write-Host "Killed port $port, PID=$($_.OwningProcess)"
+              Write-Host "Killed port $port PID=$($_.OwningProcess)"
             } catch {
               Write-Host "Could not kill PID=$($_.OwningProcess)"
             }
@@ -90,14 +90,14 @@ jobs:
       - name: Start new server
         shell: powershell
         run: |
-          $projectDir = "${{ github.workspace }}\${{ env.PROJECT_DIR }}"
-          $pidFile = "${{ github.workspace }}\${{ env.PID_FILE }}"
+          $projectDir = Join-Path "${{ github.workspace }}" "${{ env.PROJECT_DIR }}"
+          $pidFile = Join-Path "${{ github.workspace }}" "${{ env.PID_FILE }}"
           $port = ${{ env.PORT }}
-          $logDir = "${{ github.workspace }}\logs"
+          $logDir = Join-Path "${{ github.workspace }}" "logs"
           New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
-          $stdout = "$logDir\server_stdout.log"
-          $stderr = "$logDir\server_stderr.log"
+          $stdout = Join-Path $logDir "server_stdout.log"
+          $stderr = Join-Path $logDir "server_stderr.log"
 
           $proc = Start-Process python `
             -ArgumentList "-m", "waitress", "--port=$port", "--host=0.0.0.0", "AllGamesTourZiz.wsgi:application" `
@@ -110,39 +110,44 @@ jobs:
           if (-not $proc) { Write-Host "Failed to start"; exit 1 }
 
           $proc.Id | Out-File -FilePath $pidFile -NoNewline
-          Write-Host "Server PID=$($proc.Id), logs -> $logDir"
-          Write-Host "stdout: $stdout"
-          Write-Host "stderr: $stderr"
+          Write-Host "Server PID=$($proc.Id)"
+          Write-Host "Logs: $logDir"
 
           Start-Sleep -Seconds 4
 
           if ($proc.HasExited) {
-            Write-Host "SERVER CRASHED IMMEDIATELY (exit code $($proc.ExitCode))"
-            Write-Host "=== STDERR ==="
+            Write-Host "SERVER CRASHED (exit $($proc.ExitCode))"
+            Write-Host "--- STDERR ---"
             if (Test-Path $stderr) { Get-Content $stderr | Write-Host }
-            Write-Host "=== STDOUT ==="
+            Write-Host "--- STDOUT ---"
             if (Test-Path $stdout) { Get-Content $stdout | Write-Host }
             exit 1
           }
 
-          Write-Host "Process still alive after 4s, good."
+          Write-Host "Process alive after 4s."
 
       - name: Verify deployment
         shell: powershell
         run: |
+          $port = ${{ env.PORT }}
           for ($i = 1; $i -le 10; $i++) {
             Write-Host "Health check $i/10..."
             try {
-              $r = Invoke-WebRequest -Uri "http://localhost:${{ env.PORT }}/" -TimeoutSec 5 -UseBasicParsing
-              Write-Host "DEPLOY OK — HTTP $($r.StatusCode)"
+              $r = Invoke-WebRequest -Uri "http://localhost:$port/" -TimeoutSec 5 -UseBasicParsing
+              Write-Host "DEPLOY OK - HTTP $($r.StatusCode)"
               exit 0
             } catch { Start-Sleep -Seconds 3 }
           }
 
           Write-Host "Server not responding. Dumping logs:"
-          $logDir = "${{ github.workspace }}\logs"
-          Write-Host "=== STDERR ==="
-          if (Test-Path "$logDir\server_stderr.log") { Get-Content "$logDir\server_stderr.log" | Write-Host }
-          Write-Host "=== STDOUT (last 50 lines) ==="
-          if (Test-Path "$logDir\server_stdout.log") { Get-Content "$logDir\server_stdout.log" -Tail 50 | Write-Host }
+          $logDir = Join-Path "${{ github.workspace }}" "logs"
+          $errLog = Join-Path $logDir "server_stderr.log"
+          $outLog = Join-Path $logDir "server_stdout.log"
+
+          Write-Host "--- STDERR ---"
+          if (Test-Path $errLog) { Get-Content $errLog | Write-Host }
+
+          Write-Host "--- STDOUT (last 50) ---"
+          if (Test-Path $outLog) { Get-Content $outLog -Tail 50 | Write-Host }
+
           exit 1
