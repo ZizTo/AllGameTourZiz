@@ -59,18 +59,9 @@ jobs:
       - name: Stop old server
         shell: powershell
         run: |
-          $taskName = "TourZizServer"
           $port = ${{ env.PORT }}
 
-          $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-          if ($task) {
-            if ($task.State -eq "Running") {
-              Stop-ScheduledTask -TaskName $taskName
-              Write-Host "Stopped scheduled task $taskName"
-            }
-            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-            Write-Host "Removed scheduled task $taskName"
-          }
+          Unregister-ScheduledTask -TaskName "TourZizServer" -Confirm:$false -ErrorAction SilentlyContinue
 
           Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | ForEach-Object {
             try {
@@ -86,38 +77,40 @@ jobs:
         run: |
           $projectDir = Join-Path "${{ github.workspace }}" "${{ env.PROJECT_DIR }}"
           $port = ${{ env.PORT }}
-          $taskName = "TourZizServer"
 
-          $action = New-ScheduledTaskAction `
-            -Execute "python" `
-            -WorkingDirectory $projectDir `
-            -Argument "-m waitress --port=$port --host=0.0.0.0 AllGamesTourZiz.wsgi:application"
+          $pythonPath = (Get-Command python).Source
+          Write-Host "Python: $pythonPath"
 
-          $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(2)
+          $cmd = "$pythonPath -m waitress --port=$port --host=0.0.0.0 AllGamesTourZiz.wsgi:application"
 
-          Register-ScheduledTask `
-            -TaskName $taskName `
-            -Action $action `
-            -Trigger $trigger `
-            -Force
+          $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+            CommandLine = $cmd
+            CurrentDirectory = $projectDir
+          }
 
-          Start-ScheduledTask -TaskName $taskName
+          Write-Host "ReturnValue: $($result.ReturnValue)"
+          Write-Host "ProcessId: $($result.ProcessId)"
 
-          Start-Sleep -Seconds 5
+          if ($result.ReturnValue -ne 0) {
+            Write-Host "WMI failed (code $($result.ReturnValue))"
+            exit 1
+          }
 
-          $task = Get-ScheduledTask -TaskName $taskName
-          Write-Host "Task state: $($task.State)"
+          Start-Sleep -Seconds 4
 
-          if ($task.State -ne "Running") {
-            $info = Get-ScheduledTaskInfo -TaskName $taskName
-            Write-Host "Last run: $($info.LastRunTime)"
-            Write-Host "Last result: $($info.LastTaskResult)"
-            Write-Host "Task did not start. Trying direct launch..."
+          try {
+            $proc = Get-Process -Id $result.ProcessId -ErrorAction Stop
+            Write-Host "Server running, PID=$($proc.Id)"
+          } catch {
+            Write-Host "Process died immediately. Trying manual launch for debug..."
+            $log = Join-Path $projectDir "crash.log"
             Start-Process python `
               -ArgumentList "-m waitress --port=$port --host=0.0.0.0 AllGamesTourZiz.wsgi:application" `
               -WorkingDirectory $projectDir `
+              -RedirectStandardError $log `
               -WindowStyle Hidden
             Start-Sleep -Seconds 3
+            if (Test-Path $log) { Write-Host "Crash log:"; Get-Content $log | Write-Host }
           }
 
       - name: Verify deployment
