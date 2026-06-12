@@ -1,0 +1,138 @@
+# TourZiz CD — авто-деплой на Windows сервер
+# Триггерится на push в main/master
+#
+# Для self-hosted раннера на Windows сервере:
+#   1. Установи GitHub Actions Runner: Settings > Actions > Runners > New self-hosted runner > Windows
+#   2. Поменяй runs-on ниже на свой лейбл, например:
+#      runs-on: [self-hosted, windows, tourziz]
+#   3. На сервере должен стоять Python 3.12
+#   4. Порт 8000 должен быть открыт в фаерволе
+#
+# Важно для settings.py (поменяй ручками, бро):
+#   ALLOWED_HOSTS = ["*"]   # чтоб waitress пускал запросы
+#
+# Сервер будет доступен по http://ТВОЙ_IP:8000
+
+name: TourZiz Deploy
+
+on:
+  push:
+    branches: ["main", "master"]
+
+jobs:
+  deploy:
+    name: Deploy to Windows Server
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 15
+
+    env:
+      PROJECT_DIR: AllGamesTourZiz
+      PORT: 8000
+      PID_FILE: tourziz_server.pid
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles(format('{0}/requirements.txt', env.PROJECT_DIR)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ env.PROJECT_DIR }}/requirements.txt
+
+      - name: Django system checks
+        working-directory: ./${{ env.PROJECT_DIR }}
+        run: python manage.py check
+
+      - name: Check migrations
+        working-directory: ./${{ env.PROJECT_DIR }}
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Apply migrations
+        working-directory: ./${{ env.PROJECT_DIR }}
+        run: python manage.py migrate --noinput
+
+      - name: Stop old server
+        shell: powershell
+        run: |
+          $pidFile = "${{ env.PID_FILE }}"
+          $port = ${{ env.PORT }}
+
+          # Убиваем по PID-файлу
+          if (Test-Path $pidFile) {
+            $oldPid = Get-Content $pidFile
+            try {
+              Stop-Process -Id $oldPid -Force -ErrorAction Stop
+              Write-Host "Остановлен процесс PID=$oldPid"
+            } catch {
+              Write-Host "Процесс PID=$oldPid уже не жив"
+            }
+            Remove-Item $pidFile -Force
+          }
+
+          # Добиваем всё что висит на порту
+          $listeners = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+          foreach ($conn in $listeners) {
+            try {
+              Stop-Process -Id $conn.OwningProcess -Force -ErrorAction Stop
+              Write-Host "Убит процесс на порту $port, PID=$($conn.OwningProcess)"
+            } catch {
+              Write-Host "Не смог убить PID=$($conn.OwningProcess)"
+            }
+          }
+
+          Start-Sleep -Seconds 2
+
+      - name: Start new server
+        shell: powershell
+        run: |
+          $pidFile = "${{ env.PID_FILE }}"
+          $port = ${{ env.PORT }}
+
+          $proc = Start-Process python `
+            -ArgumentList "-m", "waitress", "--port=$port", "--host=0.0.0.0", "AllGamesTourZiz.wsgi:application" `
+            -WorkingDirectory "${{ github.workspace }}\${{ env.PROJECT_DIR }}" `
+            -WindowStyle Hidden `
+            -PassThru
+
+          $proc.Id | Out-File -FilePath $pidFile
+          Write-Host "Сервер запущен на порту $port, PID=$($proc.Id)"
+
+      - name: Verify deployment
+        shell: powershell
+        run: |
+          Start-Sleep -Seconds 3
+          try {
+            $response = Invoke-WebRequest -Uri "http://localhost:${{ env.PORT }}/" -TimeoutSec 10 -UseBasicParsing
+            Write-Host "Деплой успешен! Статус: $($response.StatusCode)"
+          } catch {
+            Write-Host "Не смог достучаться до сервера. Проверь логи."
+            throw
+          }
+
+  notify-fail:
+    name: Deploy Failed
+    needs: deploy
+    if: failure()
+    runs-on: [self-hosted, windows]
+
+    steps:
+      - name: Alert
+        shell: powershell
+        run: |
+          Write-Host "============================================"
+          Write-Host "ДЕПЛОЙ УПАЛ, БРО((("
+          Write-Host "Глянь логи в Actions табе на GitHub"
+          Write-Host "============================================"
