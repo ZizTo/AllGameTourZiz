@@ -49,7 +49,7 @@ def profile_view(request, usname):
                'stats': user.gamestats_set.all()}
 
     # --------
-    filtered_sessions_participants = SessionParticipants.objects.filter(user=user).order_by("session__created_at")
+    filtered_sessions_participants = SessionParticipants.objects.filter(user=user).order_by("-session__created_at")
     context['allsessions'] = filtered_sessions_participants.values("session__uniqueCode",
                                                     "session__status", "session__game__name", "session__game__image")
 

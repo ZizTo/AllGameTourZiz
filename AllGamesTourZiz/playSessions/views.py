@@ -19,7 +19,7 @@ def all_sessions_view(request):
 
     new_link = f"/sessions/?search={search}" if search else "/sessions/"
 
-    filtered_sessions = PlaySession.objects.filter(game__name__icontains=search).order_by("created_at")
+    filtered_sessions = PlaySession.objects.filter(game__name__icontains=search).order_by("-created_at")
     try:
         page = int(request.GET.get("page", 1))
         lastpage = math.floor(((filtered_sessions.count() - 1) / MAX_ON_PAGE) + 1)
@@ -281,5 +281,5 @@ def changeMMR(session):
 
 
 def ELOrating(Ra, Rb, Sa, K = 60):
-    E = 1/(1+10**((Rb-Ra)/400))
+    E = 1 / (1 + 10 ** ((Rb - Ra) / 400))
     return K * (Sa - E)
