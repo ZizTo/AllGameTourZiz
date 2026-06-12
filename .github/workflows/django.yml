@@ -25,7 +25,6 @@ jobs:
     env:
       PROJECT_DIR: AllGamesTourZiz
       PORT: 8000
-      PID_FILE: tourziz_server.pid
 
     steps:
       - name: Checkout code
@@ -60,29 +59,24 @@ jobs:
       - name: Stop old server
         shell: powershell
         run: |
-          $pidFile = Join-Path "${{ github.workspace }}" "${{ env.PID_FILE }}"
+          $taskName = "TourZizServer"
           $port = ${{ env.PORT }}
 
-          if (Test-Path $pidFile) {
-            $oldPid = (Get-Content $pidFile -Raw).Trim()
-            if ($oldPid) {
-              try {
-                Stop-Process -Id $oldPid -Force -ErrorAction Stop
-                Write-Host "Stopped PID=$oldPid"
-              } catch {
-                Write-Host "PID=$oldPid already dead"
-              }
+          $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+          if ($task) {
+            if ($task.State -eq "Running") {
+              Stop-ScheduledTask -TaskName $taskName
+              Write-Host "Stopped scheduled task $taskName"
             }
-            Remove-Item $pidFile -Force
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+            Write-Host "Removed scheduled task $taskName"
           }
 
           Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | ForEach-Object {
             try {
               Stop-Process -Id $_.OwningProcess -Force -ErrorAction Stop
               Write-Host "Killed port $port PID=$($_.OwningProcess)"
-            } catch {
-              Write-Host "Could not kill PID=$($_.OwningProcess)"
-            }
+            } catch { }
           }
 
           Start-Sleep -Seconds 2
@@ -91,40 +85,44 @@ jobs:
         shell: powershell
         run: |
           $projectDir = Join-Path "${{ github.workspace }}" "${{ env.PROJECT_DIR }}"
-          $pidFile = Join-Path "${{ github.workspace }}" "${{ env.PID_FILE }}"
           $port = ${{ env.PORT }}
-          $logDir = Join-Path "${{ github.workspace }}" "logs"
-          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+          $taskName = "TourZizServer"
 
-          $stdout = Join-Path $logDir "server_stdout.log"
-          $stderr = Join-Path $logDir "server_stderr.log"
-
-          $proc = Start-Process python `
-            -ArgumentList "-m", "waitress", "--port=$port", "--host=0.0.0.0", "AllGamesTourZiz.wsgi:application" `
+          $action = New-ScheduledTaskAction `
+            -Execute "python" `
             -WorkingDirectory $projectDir `
-            -RedirectStandardOutput $stdout `
-            -RedirectStandardError $stderr `
-            -WindowStyle Hidden `
-            -PassThru
+            -Argument "-m waitress --port=$port --host=0.0.0.0 AllGamesTourZiz.wsgi:application"
 
-          if (-not $proc) { Write-Host "Failed to start"; exit 1 }
+          $trigger = New-ScheduledTaskTrigger -AtStartup
 
-          $proc.Id | Out-File -FilePath $pidFile -NoNewline
-          Write-Host "Server PID=$($proc.Id)"
-          Write-Host "Logs: $logDir"
+          $principal = New-ScheduledTaskPrincipal `
+            -UserId "NT AUTHORITY\SYSTEM" `
+            -LogonType ServiceAccount `
+            -RunLevel Highest
+
+          $settings = New-ScheduledTaskSettingsSet `
+            -AllowStartIfOnBatteries `
+            -DontStopIfGoingOnBatteries `
+            -StartWhenAvailable `
+            -RestartCount 3 `
+            -RestartInterval (New-TimeSpan -Minutes 1)
+
+          Register-ScheduledTask `
+            -TaskName $taskName `
+            -Action $action `
+            -Trigger $trigger `
+            -Principal $principal `
+            -Settings $settings `
+            -Force
+
+          Start-ScheduledTask -TaskName $taskName
 
           Start-Sleep -Seconds 4
 
-          if ($proc.HasExited) {
-            Write-Host "SERVER CRASHED (exit $($proc.ExitCode))"
-            Write-Host "--- STDERR ---"
-            if (Test-Path $stderr) { Get-Content $stderr | Write-Host }
-            Write-Host "--- STDOUT ---"
-            if (Test-Path $stdout) { Get-Content $stdout | Write-Host }
-            exit 1
-          }
-
-          Write-Host "Process alive after 4s."
+          $task = Get-ScheduledTask -TaskName $taskName
+          Write-Host "Scheduled task '$taskName' state: $($task.State)"
+          Write-Host "Server should be on port $port"
+          Write-Host "Logs: $projectDir"
 
       - name: Verify deployment
         shell: powershell
@@ -138,16 +136,6 @@ jobs:
               exit 0
             } catch { Start-Sleep -Seconds 3 }
           }
-
-          Write-Host "Server not responding. Dumping logs:"
-          $logDir = Join-Path "${{ github.workspace }}" "logs"
-          $errLog = Join-Path $logDir "server_stderr.log"
-          $outLog = Join-Path $logDir "server_stdout.log"
-
-          Write-Host "--- STDERR ---"
-          if (Test-Path $errLog) { Get-Content $errLog | Write-Host }
-
-          Write-Host "--- STDOUT (last 50) ---"
-          if (Test-Path $outLog) { Get-Content $outLog -Tail 50 | Write-Host }
-
+          Write-Host "Server not responding after 30s."
+          Write-Host "Check: Get-ScheduledTask -TaskName TourZizServer | Select State, LastTaskResult"
           exit 1
