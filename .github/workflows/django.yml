@@ -1,14 +1,15 @@
 # TourZiz CD — авто-деплой на Windows сервер
 # Триггерится на push в main/master
 #
-# Для self-hosted раннера на Windows сервере:
-#   1. Установи GitHub Actions Runner: Settings > Actions > Runners > New self-hosted runner > Windows
+# Для self-hosted раннера:
+#   1. Установи GitHub Actions Runner: Settings > Actions > Runners > New > Windows
 #   2. Поменяй runs-on ниже на свой лейбл, например:
 #      runs-on: [self-hosted, windows, tourziz]
-#   3. Порт 8000 должен быть открыт в фаерволе
+#   3. Python 3.14 должен быть в PATH (python --version)
+#   4. Порт 8000 открыт в фаерволе
 #
-# Важно для settings.py (поменяй ручками, бро):
-#   ALLOWED_HOSTS = ["*"]   # чтоб waitress пускал запросы
+# settings.py (поменяй ручками):
+#   ALLOWED_HOSTS = ["*"]
 
 name: TourZiz Deploy
 
@@ -26,51 +27,12 @@ jobs:
       PROJECT_DIR: AllGamesTourZiz
       PORT: 8000
       PID_FILE: tourziz_server.pid
-      PYTHON_DIR: ${{ github.workspace }}\.python
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Python
-        shell: powershell
-        run: |
-          $pythonDir = "${{ env.PYTHON_DIR }}"
-
-          if (Test-Path "$pythonDir\python.exe") {
-            $ver = & "$pythonDir\python.exe" --version 2>&1
-            Write-Host "Python already installed: $ver"
-          } else {
-            Write-Host "Downloading Python 3.12..."
-            $url = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip"
-            $zip = "$env:TEMP\python-3.12.10.zip"
-
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-
-            Write-Host "Extracting..."
-            New-Item -ItemType Directory -Force -Path $pythonDir | Out-Null
-            Expand-Archive -Path $zip -DestinationPath $pythonDir -Force
-
-            # Enable pip in embeddable Python
-            $pthFile = "$pythonDir\python312._pth"
-            $content = Get-Content $pthFile -Raw
-            $content = $content -replace "#import site", "import site"
-            $content = $content -replace "python312.zip", "#python312.zip"
-            Set-Content $pthFile -Value $content
-
-            Write-Host "Bootstrapping pip..."
-            & "$pythonDir\python.exe" -m ensurepip --upgrade
-            & "$pythonDir\python.exe" -m pip install --upgrade pip
-
-            Write-Host "Python 3.12 installed successfully"
-          }
-
-          # Put our Python FIRST in PATH for subsequent steps
-          "$pythonDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
-          "$pythonDir\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-      - name: Verify Python & pip
+      - name: Verify Python
         shell: cmd
         run: |
           python --version
@@ -105,9 +67,8 @@ jobs:
             $oldPid = (Get-Content $pidFile -Raw).Trim()
             if ($oldPid) {
               try {
-                $proc = Get-Process -Id $oldPid -ErrorAction Stop
-                Stop-Process -Id $oldPid -Force
-                Write-Host "Stopped PID=$oldPid ($($proc.ProcessName))"
+                Stop-Process -Id $oldPid -Force -ErrorAction Stop
+                Write-Host "Stopped PID=$oldPid"
               } catch {
                 Write-Host "PID=$oldPid already dead"
               }
@@ -116,15 +77,12 @@ jobs:
           }
 
           $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-          if ($conns) {
-            foreach ($c in $conns) {
-              try {
-                $p = Get-Process -Id $c.OwningProcess -ErrorAction Stop
-                Stop-Process -Id $c.OwningProcess -Force
-                Write-Host "Killed process on port $port, PID=$($c.OwningProcess)"
-              } catch {
-                Write-Host "Could not kill PID=$($c.OwningProcess)"
-              }
+          foreach ($c in $conns) {
+            try {
+              Stop-Process -Id $c.OwningProcess -Force -ErrorAction Stop
+              Write-Host "Killed port $port, PID=$($c.OwningProcess)"
+            } catch {
+              Write-Host "Could not kill PID=$($c.OwningProcess)"
             }
           }
 
@@ -154,31 +112,15 @@ jobs:
       - name: Verify deployment
         shell: powershell
         run: |
-          $port = ${{ env.PORT }}
           for ($i = 1; $i -le 10; $i++) {
             Write-Host "Health check $i/10..."
             try {
-              $r = Invoke-WebRequest -Uri "http://localhost:$port/" -TimeoutSec 5 -UseBasicParsing
+              $r = Invoke-WebRequest -Uri "http://localhost:${{ env.PORT }}/" -TimeoutSec 5 -UseBasicParsing
               Write-Host "DEPLOY SUCCESS! HTTP $($r.StatusCode)"
               exit 0
             } catch {
               Start-Sleep -Seconds 3
             }
           }
-          Write-Host "Server did not respond. Check logs."
+          Write-Host "Server did not respond."
           exit 1
-
-  notify-fail:
-    name: Deploy Failed
-    needs: deploy
-    if: failure()
-    runs-on: [self-hosted, windows]
-
-    steps:
-      - name: Alert
-        shell: powershell
-        run: |
-          Write-Host "============================================"
-          Write-Host "=     ДЕПЛОЙ УПАЛ, БРО((                  ="
-          Write-Host "=     Глянь логи в Actions на GitHub       ="
-          Write-Host "============================================"
