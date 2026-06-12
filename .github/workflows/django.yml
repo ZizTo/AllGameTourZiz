@@ -5,13 +5,11 @@
 #   1. Установи GitHub Actions Runner: Settings > Actions > Runners > New self-hosted runner > Windows
 #   2. Поменяй runs-on ниже на свой лейбл, например:
 #      runs-on: [self-hosted, windows, tourziz]
-#   3. На сервере должен стоять Python 3.12
+#   3. На сервере должен стоять Python 3.12 (python --version)
 #   4. Порт 8000 должен быть открыт в фаерволе
 #
 # Важно для settings.py (поменяй ручками, бро):
 #   ALLOWED_HOSTS = ["*"]   # чтоб waitress пускал запросы
-#
-# Сервер будет доступен по http://ТВОЙ_IP:8000
 
 name: TourZiz Deploy
 
@@ -34,63 +32,69 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Verify Python
+        shell: cmd
+        run: |
+          python --version
+          where python
 
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles(format('{0}/requirements.txt', env.PROJECT_DIR)) }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+      - name: Upgrade pip
+        shell: cmd
+        run: python -m pip install --upgrade pip
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r ${{ env.PROJECT_DIR }}/requirements.txt
+        shell: cmd
+        run: python -m pip install -r "${{ env.PROJECT_DIR }}\requirements.txt"
 
       - name: Django system checks
+        shell: cmd
         working-directory: ./${{ env.PROJECT_DIR }}
         run: python manage.py check
 
-      - name: Check migrations
+      - name: Check pending migrations
+        shell: cmd
         working-directory: ./${{ env.PROJECT_DIR }}
         run: python manage.py makemigrations --check --dry-run
 
       - name: Apply migrations
+        shell: cmd
         working-directory: ./${{ env.PROJECT_DIR }}
         run: python manage.py migrate --noinput
 
       - name: Stop old server
         shell: powershell
         run: |
-          $pidFile = "${{ env.PID_FILE }}"
+          $pidFile = "${{ github.workspace }}\${{ env.PID_FILE }}"
           $port = ${{ env.PORT }}
 
-          # Убиваем по PID-файлу
           if (Test-Path $pidFile) {
-            $oldPid = Get-Content $pidFile
-            try {
-              Stop-Process -Id $oldPid -Force -ErrorAction Stop
-              Write-Host "Остановлен процесс PID=$oldPid"
-            } catch {
-              Write-Host "Процесс PID=$oldPid уже не жив"
+            $oldPid = Get-Content $pidFile -Raw
+            if ($oldPid) {
+              $oldPid = $oldPid.Trim()
+              try {
+                $proc = Get-Process -Id $oldPid -ErrorAction Stop
+                Stop-Process -Id $oldPid -Force
+                Write-Host "Остановлен процесс PID=$oldPid, Name=$($proc.ProcessName)"
+              } catch {
+                Write-Host "PID=$oldPid уже мёртв"
+              }
             }
             Remove-Item $pidFile -Force
           }
 
-          # Добиваем всё что висит на порту
-          $listeners = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-          foreach ($conn in $listeners) {
-            try {
-              Stop-Process -Id $conn.OwningProcess -Force -ErrorAction Stop
-              Write-Host "Убит процесс на порту $port, PID=$($conn.OwningProcess)"
-            } catch {
-              Write-Host "Не смог убить PID=$($conn.OwningProcess)"
+          $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+          if ($connections) {
+            foreach ($c in $connections) {
+              try {
+                $p = Get-Process -Id $c.OwningProcess -ErrorAction Stop
+                Stop-Process -Id $c.OwningProcess -Force
+                Write-Host "Убит процесс на порту $port, PID=$($c.OwningProcess), Name=$($p.ProcessName)"
+              } catch {
+                Write-Host "Не смог убить PID=$($c.OwningProcess)"
+              }
             }
+          } else {
+            Write-Host "Порт $port свободен"
           }
 
           Start-Sleep -Seconds 2
@@ -98,29 +102,44 @@ jobs:
       - name: Start new server
         shell: powershell
         run: |
-          $pidFile = "${{ env.PID_FILE }}"
+          $projectDir = "${{ github.workspace }}\${{ env.PROJECT_DIR }}"
+          $pidFile = "${{ github.workspace }}\${{ env.PID_FILE }}"
           $port = ${{ env.PORT }}
 
           $proc = Start-Process python `
             -ArgumentList "-m", "waitress", "--port=$port", "--host=0.0.0.0", "AllGamesTourZiz.wsgi:application" `
-            -WorkingDirectory "${{ github.workspace }}\${{ env.PROJECT_DIR }}" `
+            -WorkingDirectory $projectDir `
             -WindowStyle Hidden `
             -PassThru
 
-          $proc.Id | Out-File -FilePath $pidFile
+          if (-not $proc) {
+            Write-Host "Не удалось запустить процесс"
+            exit 1
+          }
+
+          $proc.Id | Out-File -FilePath $pidFile -NoNewline
           Write-Host "Сервер запущен на порту $port, PID=$($proc.Id)"
 
       - name: Verify deployment
         shell: powershell
         run: |
-          Start-Sleep -Seconds 3
-          try {
-            $response = Invoke-WebRequest -Uri "http://localhost:${{ env.PORT }}/" -TimeoutSec 10 -UseBasicParsing
-            Write-Host "Деплой успешен! Статус: $($response.StatusCode)"
-          } catch {
-            Write-Host "Не смог достучаться до сервера. Проверь логи."
-            throw
+          $port = ${{ env.PORT }}
+          $maxTries = 10
+
+          for ($i = 1; $i -le $maxTries; $i++) {
+            Write-Host "Проверка $i/$maxTries..."
+            try {
+              $r = Invoke-WebRequest -Uri "http://localhost:$port/" -TimeoutSec 5 -UseBasicParsing
+              Write-Host "ДЕПЛОЙ УСПЕШЕН! HTTP $($r.StatusCode) — сервер отвечает"
+              exit 0
+            } catch {
+              Write-Host "Ждём..."
+              Start-Sleep -Seconds 3
+            }
           }
+
+          Write-Host "Сервер не ответил за $($maxTries * 3) секунд. Проверь логи waitress."
+          exit 1
 
   notify-fail:
     name: Deploy Failed
@@ -133,6 +152,6 @@ jobs:
         shell: powershell
         run: |
           Write-Host "============================================"
-          Write-Host "ДЕПЛОЙ УПАЛ, БРО((("
-          Write-Host "Глянь логи в Actions табе на GitHub"
+          Write-Host "=     ДЕПЛОЙ УПАЛ, БРО((                  ="
+          Write-Host "=     Глянь логи в Actions на GitHub       ="
           Write-Host "============================================"
