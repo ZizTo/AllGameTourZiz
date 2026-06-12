@@ -5,8 +5,8 @@
 #   1. Установи GitHub Actions Runner: Settings > Actions > Runners > New self-hosted runner > Windows
 #   2. Поменяй runs-on ниже на свой лейбл, например:
 #      runs-on: [self-hosted, windows, tourziz]
-#   3. На сервере должен стоять Python 3.12 (python --version)
-#   4. Порт 8000 должен быть открыт в фаерволе
+#   3. Порт 8000 должен быть открыт в фаерволе
+#   4. Если системный Python битый — setup-python поставит чистый, ок
 #
 # Важно для settings.py (поменяй ручками, бро):
 #   ALLOWED_HOSTS = ["*"]   # чтоб waitress пускал запросы
@@ -32,15 +32,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify Python
+      - name: Setup Python (clean install)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Force clean Python to front of PATH
+        shell: powershell
+        run: |
+          $toolDirs = Get-ChildItem "$env:RUNNER_TOOL_CACHE\Python\3.12.*\x64" -Directory | Sort-Object Name -Descending
+          if (-not $toolDirs) {
+            Write-Host "Toolchain Python not found, using system python"
+            exit 0
+          }
+          $pythonHome = $toolDirs[0].FullName
+          Write-Host "Clean Python: $pythonHome"
+          "$pythonHome" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+          "$pythonHome\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify Python & pip
         shell: cmd
         run: |
           python --version
-          where python
-
-      - name: Upgrade pip
-        shell: cmd
-        run: python -m pip install --upgrade pip
+          python -m pip --version
 
       - name: Install dependencies
         shell: cmd
@@ -68,13 +82,12 @@ jobs:
           $port = ${{ env.PORT }}
 
           if (Test-Path $pidFile) {
-            $oldPid = Get-Content $pidFile -Raw
+            $oldPid = (Get-Content $pidFile -Raw).Trim()
             if ($oldPid) {
-              $oldPid = $oldPid.Trim()
               try {
                 $proc = Get-Process -Id $oldPid -ErrorAction Stop
                 Stop-Process -Id $oldPid -Force
-                Write-Host "Остановлен процесс PID=$oldPid, Name=$($proc.ProcessName)"
+                Write-Host "Остановлен PID=$oldPid ($($proc.ProcessName))"
               } catch {
                 Write-Host "PID=$oldPid уже мёртв"
               }
@@ -82,13 +95,13 @@ jobs:
             Remove-Item $pidFile -Force
           }
 
-          $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-          if ($connections) {
-            foreach ($c in $connections) {
+          $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+          if ($conns) {
+            foreach ($c in $conns) {
               try {
                 $p = Get-Process -Id $c.OwningProcess -ErrorAction Stop
                 Stop-Process -Id $c.OwningProcess -Force
-                Write-Host "Убит процесс на порту $port, PID=$($c.OwningProcess), Name=$($p.ProcessName)"
+                Write-Host "Убит процесс на порту $port, PID=$($c.OwningProcess) ($($p.ProcessName))"
               } catch {
                 Write-Host "Не смог убить PID=$($c.OwningProcess)"
               }
@@ -124,21 +137,17 @@ jobs:
         shell: powershell
         run: |
           $port = ${{ env.PORT }}
-          $maxTries = 10
-
-          for ($i = 1; $i -le $maxTries; $i++) {
-            Write-Host "Проверка $i/$maxTries..."
+          for ($i = 1; $i -le 10; $i++) {
+            Write-Host "Проверка $i/10..."
             try {
               $r = Invoke-WebRequest -Uri "http://localhost:$port/" -TimeoutSec 5 -UseBasicParsing
-              Write-Host "ДЕПЛОЙ УСПЕШЕН! HTTP $($r.StatusCode) — сервер отвечает"
+              Write-Host "ДЕПЛОЙ УСПЕШЕН! HTTP $($r.StatusCode)"
               exit 0
             } catch {
-              Write-Host "Ждём..."
               Start-Sleep -Seconds 3
             }
           }
-
-          Write-Host "Сервер не ответил за $($maxTries * 3) секунд. Проверь логи waitress."
+          Write-Host "Сервер не ответил. Проверь логи."
           exit 1
 
   notify-fail:
