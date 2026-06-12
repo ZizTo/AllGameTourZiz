@@ -22,7 +22,7 @@ def all_sessions_view(request):
     filtered_sessions = PlaySession.objects.filter(game__name__icontains=search).order_by("-created_at")
     try:
         page = int(request.GET.get("page", 1))
-        lastpage = math.floor(((filtered_sessions.count() - 1) / MAX_ON_PAGE) + 1)
+        lastpage = max(math.floor(((filtered_sessions.count() - 1) / MAX_ON_PAGE) + 1), 1)
         if page < 1 or page > lastpage:
             raise
     except:

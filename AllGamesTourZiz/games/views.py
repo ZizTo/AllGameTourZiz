@@ -17,7 +17,7 @@ def all_games_view(request):
     filtered_games = Game.objects.filter(name__icontains=search).filter(relateOnId=None)
     try:
         page = int(request.GET.get("page", 1))
-        last_page = math.floor(((filtered_games.count() - 1) / MAX_ON_PAGE) + 1)
+        last_page = max(math.floor(((filtered_games.count() - 1) / MAX_ON_PAGE) + 1), 1)
         if page < 1 or page > last_page:
             raise
     except:
