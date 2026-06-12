@@ -1,72 +1,94 @@
 {% extends "base.html" %}
 
-{% block title %}{{ gamename }}{% endblock %}
+{% block title %}{{ gamename }} — TourZiz{% endblock %}
 
 {% block content %}
-    <p>Сессия игры </p>
-    <table>
-        <tr class="clickable-row" data-href="/games/{{gamename}}">
-            <td>{% include "avatar.html" with avatar=gameimage width=70 height=70 only%}</td>
-            <td>{{ gamename }}</td>
-        </tr>
-    </table>
-    {% if not adminteams %} <p>Статус: {% if status == 0 %}Не начата
-            {% elif status == 1 %}Игра идёт
-            {% elif status == 2 %}Отменена
-            {% elif status == 3 %}Ничья
-            {% else %}Победа команды {{ winner }}{% endif %}
-    </p> {% else %}
-    <form method="POST" action="/sessions/{{uniqueCode}}/status/">
-        {% csrf_token %}
-        <select id="newstatus" name="newstatus">
-            <option value="0">Не начато</option>
-            <option value="1">Игра идёт</option>
-            <option value="2">Отменён</option>
-            <option value="3">Ничья</option>
-            {% for option in adminteams %}
-            <option value="{{option.value}}">{{option.team}}</option>
-            {% endfor %}
-        </select>
-        <input type="submit" value="Send" >
-    </form>
+    <div class="card-row clickable-row" data-href="/games/{{ gamename }}" style="cursor:pointer;margin-bottom:24px;">
+        {% include "avatar.html" with avatar=gameimage class="card-row-avatar card-row-avatar-lg" only %}
+        <div class="card-row-body">
+            <div class="card-row-title">{{ gamename }}</div>
+        </div>
+    </div>
+
+    {% if not adminteams %}
+    <div class="session-status-bar">
+        <span class="session-status-label">Статус</span>
+        {% if status == 0 %}<span class="badge badge-not-started">Не начата</span>
+        {% elif status == 1 %}<span class="badge badge-live">Идёт</span>
+        {% elif status == 2 %}<span class="badge badge-cancelled">Отменена</span>
+        {% elif status == 3 %}<span class="badge badge-draw">Ничья</span>
+        {% else %}<span class="badge badge-winner">Победа команды {{ winner }}</span>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="session-status-bar">
+        <span class="session-status-label">Статус (админ)</span>
+        <form method="POST" action="/sessions/{{ uniqueCode }}/status/" class="admin-form" style="margin-top:0;">
+            {% csrf_token %}
+            <select id="newstatus" name="newstatus" class="form-select" style="width:auto;">
+                <option value="0">Не начато</option>
+                <option value="1">Игра идёт</option>
+                <option value="2">Отменён</option>
+                <option value="3">Ничья</option>
+                {% for option in adminteams %}
+                <option value="{{ option.value }}">{{ option.team }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">Обновить</button>
+        </form>
+    </div>
     {% endif %}
 
-    <p>Все команды</p>
+    <div class="section-title">Команды</div>
+
     {% for team in teams %}
-    <p>Команда {{ team.number.text }} {{ team.results.text }}
-        {% if adminteams %}
-        <form method="POST" action="/sessions/{{ uniqueCode }}/{{ team.number.value }}/">
-            {% csrf_token %}
-            <input type="number" id="points" name="points"
-                   {% if team.results.isPoints %}value="{{team.results.value}}"{% endif %}>
-            <input class="html-duration-picker" id="time" name="time"
-                   {% if not team.results.isPoints %} data-duration="{{team.results.value}}"{% endif %}>
-            <input type="submit" value="Send" >
-        </form>
-        {% endif %}
-    </p>
-    <table>
+    <div class="team-block">
+        <div class="team-header">
+            <span class="team-header-title">Команда {{ team.number.text }}</span>
+            <span class="team-header-result">{{ team.results.text }}</span>
+        </div>
+
         {% for player in team.players %}
-        <tr class="clickable-row" data-href="/users/{{player.name}}">
-            <td>{% include "avatar.html" with avatar=player.image only%}</td>
-            <td>{{ player.name }}</td>
-            <td>{{ player.MMR }} MMR</td>
-            {% if player.mmrChange is not None %}<td>
-            {% if player.mmrChange >= 0 %}+{% endif %}{{ player.mmrChange }} MMR
-            </td> {% endif %}
-        </tr>
+        <div class="team-player-row clickable-row" data-href="/users/{{ player.name }}">
+            {% include "avatar.html" with avatar=player.image class="team-player-avatar" only %}
+            <span class="team-player-name">{{ player.name }}</span>
+            <span class="team-player-mmr">{{ player.MMR }} MMR</span>
+            {% if player.mmrChange is not None %}
+            <span class="team-player-change
+                {% if player.mmrChange > 0 %}mmr-positive
+                {% elif player.mmrChange < 0 %}mmr-negative
+                {% else %}mmr-zero{% endif %}">
+                {% if player.mmrChange >= 0 %}+{% endif %}{{ player.mmrChange }}
+            </span>
+            {% endif %}
+        </div>
         {% empty %}
-        <tr><td>Няма игроков(((</td></tr>
+        <div class="empty-state" style="margin:12px 20px;">Нет игроков</div>
         {% endfor %}
-    </table>
+
+        {% if adminteams %}
+        <div class="team-admin-body">
+            <form method="POST" action="/sessions/{{ uniqueCode }}/{{ team.number.value }}/" class="admin-form">
+                {% csrf_token %}
+                <input type="number"
+                       id="points" name="points"
+                       placeholder="Очки"
+                       {% if team.results.isPoints %}value="{{ team.results.value }}"{% endif %} />
+                <input class="html-duration-picker"
+                       id="time" name="time"
+                       placeholder="Время"
+                       {% if not team.results.isPoints %}data-duration="{{ team.results.value }}"{% endif %} />
+                <button type="submit" class="btn btn-sm">Сохранить</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
     {% empty %}
-    <p>Няма команд(((</p>
+    <div class="empty-state">Нет команд</div>
     {% endfor %}
 
 {% endblock %}
 
 {% block additional_scripts %}
-
-document.getElementById("newstatus").value = {{status}}
-
+document.getElementById("newstatus").value = {{ status }};
 {% endblock %}
